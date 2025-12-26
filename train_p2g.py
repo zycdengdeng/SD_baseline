@@ -154,7 +154,8 @@ trainer = pl.Trainer(
     logger=logger,
     enable_checkpointing=True,
     gradient_clip_val=1.0,
-    check_val_every_n_epoch=1,
+    check_val_every_n_epoch=10,  # 每 10 个 epoch 验证一次
+    limit_val_batches=50,        # 每次验证只跑 50 个 batch
     precision="16-mixed",  # 混合精度训练
 )
 

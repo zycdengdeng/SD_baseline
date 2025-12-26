@@ -147,7 +147,7 @@ class ProjToGTDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_dataset,
-            batch_size=1,
+            batch_size=8,  # 验证不需要反向传播，可以用更大的 batch
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
