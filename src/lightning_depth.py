@@ -23,7 +23,8 @@ def parse_args():
 
 class LidarDiffusionModule(pl.LightningModule):
     def __init__(self, lr=1e-4, t_max=1000, weight_decay=0.0,
-                 model_id="runwayml/stable-diffusion-v1-5", lidar_channels=1):
+                 model_id="runwayml/stable-diffusion-v1-5", lidar_channels=1,
+                 max_epochs=3000, warmup_epochs=50):
         super().__init__()
         self.save_hyperparameters()
 
@@ -42,10 +43,33 @@ class LidarDiffusionModule(pl.LightningModule):
 
         self.lr = lr
         self.weight_decay = weight_decay
+        self.max_epochs = max_epochs
+        self.warmup_epochs = warmup_epochs
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.model.parameters(),
-                                 lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.AdamW(self.model.parameters(),
+                                      lr=self.lr, weight_decay=self.weight_decay)
+
+        # 余弦退火学习率调度器（带预热）
+        def lr_lambda(epoch):
+            if epoch < self.warmup_epochs:
+                # 线性预热
+                return epoch / self.warmup_epochs
+            else:
+                # 余弦退火
+                progress = (epoch - self.warmup_epochs) / (self.max_epochs - self.warmup_epochs)
+                return 0.5 * (1 + torch.cos(torch.tensor(progress * 3.14159)).item())
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+            }
+        }
 
     def encode_rgb(self, rgb):
         latents = self.vae.encode(rgb).latent_dist.sample()

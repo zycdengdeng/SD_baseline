@@ -75,6 +75,8 @@ model = LidarDiffusionModule(
     weight_decay=float(config["train"].get("weight_decay", 0.0)),
     model_id=config["model"].get("model_id"),
     lidar_channels=config["model"].get("lidar_channels", 3),
+    max_epochs=config["train"].get("max_epochs", 3000),
+    warmup_epochs=config["train"].get("warmup_epochs", 50),
 )
 
 # 回调函数
@@ -83,17 +85,25 @@ best_checkpoint = ModelCheckpoint(
     filename="best-epoch={epoch:03d}-val_loss={val/loss:.3f}",
     monitor="val/loss",
     mode="min",
-    save_top_k=10,
+    save_top_k=5,      # 保留 5 个最佳
     verbose=True
 )
 
 # 定期保存
 periodic_checkpoint = ModelCheckpoint(
     dirpath=f"{save_dir}/checkpoints",
-    filename="periodic-epoch={epoch:03d}",
-    every_n_epochs=20,  # 每20个epoch
-    save_top_k=-1,     # 保存所有定期checkpoint
+    filename="periodic-epoch={epoch:04d}",
+    every_n_epochs=100,  # 每 100 个 epoch 保存
+    save_top_k=-1,
     verbose=True
+)
+
+# 最新状态保存（用于断点续训）
+last_checkpoint = ModelCheckpoint(
+    dirpath=f"{save_dir}/checkpoints",
+    filename="last",
+    save_last=True,
+    every_n_epochs=1,
 )
 
 
@@ -150,11 +160,11 @@ trainer = pl.Trainer(
     devices=2,  # 使用2个GPU
     strategy="ddp",
     log_every_n_steps=10,
-    callbacks=[TQDMProgressBar(), best_checkpoint, periodic_checkpoint, lr_monitor, image_callback],
+    callbacks=[TQDMProgressBar(), best_checkpoint, periodic_checkpoint, last_checkpoint, lr_monitor, image_callback],
     logger=logger,
     enable_checkpointing=True,
     gradient_clip_val=1.0,
-    check_val_every_n_epoch=10,  # 每 10 个 epoch 验证一次
+    check_val_every_n_epoch=50,  # 每 50 个 epoch 验证一次
     limit_val_batches=50,        # 每次验证只跑 50 个 batch
     precision="16-mixed",  # 混合精度训练
 )
