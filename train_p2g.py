@@ -65,8 +65,7 @@ os.makedirs(f"{save_dir}/logs", exist_ok=True)
 datamodule = ProjToGTDataModule(
     config=config,
     batch_size=config["train"]["batch_size"],
-    num_workers=8,
-    val_split=0.2
+    num_workers=8
 )
 
 # 模型
