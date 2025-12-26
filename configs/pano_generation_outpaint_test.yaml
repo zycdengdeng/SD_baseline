@@ -1,0 +1,16 @@
+dataset:
+  name: 'mp3d_test'  # 使用测试版本的数据集
+  image_root_dir: /mnt/vdb1/lyt
+  fov: 90
+  rot: 45
+  resolution: 512
+  crop_size: 512
+  seed: 0
+train:
+  lr: 0.0002
+model:
+  model_type: pano_generation_outpaint
+  guidance_scale: 9.
+  model_id: stabilityai/stable-diffusion-2-inpainting
+  single_image_ft: False
+  diff_timestep: 50 

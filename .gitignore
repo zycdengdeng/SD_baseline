@@ -1,0 +1,25 @@
+# 大型数据/模型目录
+experiments/
+lightning_logs/
+checkpoints/
+inference_results/
+inference_results_*/
+
+# 生成的视频/图片结果
+vedio_car_generated*/
+combined_transform_results/
+rotation_translation_results/
+outputs/
+output/
+tmp/
+
+# 压缩包
+*.tar.gz
+
+# 缓存
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 日志
+scripts/logs/

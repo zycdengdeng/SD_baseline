@@ -1,0 +1,20 @@
+# Configuration for Proj to GT Diffusion Model
+
+dataset:
+  data_root: "/mnt/zihanw/车路协同投影工作/batch_projection/乌鸡变版本/output_Result"  # 你的数据根目录
+  image_size: [512, 512]  # 图像大小，可以根据需要调整
+
+model:
+  model_id: "runwayml/stable-diffusion-v1-5"  # 预训练模型
+  lidar_channels: 3  # proj图像是RGB，所以是3通道
+  t_max: 1000  # 扩散步数
+
+train:
+  batch_size: 20  # 每个GPU的batch size
+  max_epochs: 50
+  lr: 1e-4
+  weight_decay: 0.0
+
+# 日志和保存路径
+log_dir: "./logs"
+save_dir: "./experiments"

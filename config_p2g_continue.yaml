@@ -1,0 +1,17 @@
+dataset:
+  data_root: "/mnt/zihanw/车路协同投影工作/batch_projection/乌鸡变版本/output_Result"
+  image_size: [512, 512]
+
+model:
+  model_id: "runwayml/stable-diffusion-v1-5"
+  lidar_channels: 3
+  t_max: 1000
+
+train:
+  batch_size: 16
+  max_epochs: 200  # 增加到200
+  lr: 5e-5         # 可以考虑降低学习率
+  weight_decay: 0.0
+
+save_dir: "./experiments"
+log_dir: "./logs"
