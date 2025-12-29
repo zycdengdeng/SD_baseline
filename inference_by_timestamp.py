@@ -251,15 +251,47 @@ def main():
     if generate_video and video_frames:
         print("\n正在生成视频...")
         for view, frames in video_frames.items():
+            if len(frames) == 0:
+                print(f"  警告: {view} 没有帧，跳过")
+                continue
+
             video_path = os.path.join(output_dir, f"video_{view}_comparison.mp4")
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(video_path, fourcc, video_fps, (1280, 720))
 
-            for frame in frames:
-                out.write(frame)
+            # 尝试不同的编码器
+            codecs = [
+                ('mp4v', '.mp4'),
+                ('XVID', '.avi'),
+                ('MJPG', '.avi'),
+            ]
 
-            out.release()
-            print(f"  视频已保存: {video_path} ({len(frames)} 帧, {video_fps} fps)")
+            success = False
+            for codec, ext in codecs:
+                try:
+                    test_path = video_path.replace('.mp4', ext)
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    out = cv2.VideoWriter(test_path, fourcc, video_fps, (1280, 720))
+
+                    if not out.isOpened():
+                        print(f"  编码器 {codec} 不可用，尝试下一个...")
+                        continue
+
+                    for frame in frames:
+                        out.write(frame)
+
+                    out.release()
+
+                    # 检查文件是否有效
+                    if os.path.exists(test_path) and os.path.getsize(test_path) > 0:
+                        print(f"  视频已保存: {test_path} ({len(frames)} 帧, {video_fps} fps)")
+                        success = True
+                        break
+                    else:
+                        print(f"  编码器 {codec} 生成失败，尝试下一个...")
+                except Exception as e:
+                    print(f"  编码器 {codec} 错误: {e}")
+
+            if not success:
+                print(f"  错误: 无法生成 {view} 视频，所有编码器都失败")
 
         print(f"\n视频生成完成!")
 
