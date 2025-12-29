@@ -206,6 +206,11 @@ def main():
 
         views = timestamps_data[timestamp]
         for view, paths in views.items():
+            # 在纯 video 模式下，跳过不需要的视角
+            if not generate_images and generate_video:
+                if video_view != "all" and video_view != view:
+                    continue  # 跳过不需要的视角
+
             gt_tensor = load_image(paths['gt_path']).unsqueeze(0).cuda()
             proj_tensor = load_image(paths['proj_path']).unsqueeze(0).cuda()
 
@@ -225,14 +230,20 @@ def main():
                 save_image(generated.cpu(), gen_path)
 
             # 缓存视频帧
-            if generate_video and (video_view == "all" or video_view == view):
+            if generate_video:
                 frame = create_comparison_frame(proj_tensor, generated, gt_tensor)
                 video_frames[view].append(frame)
 
             print(f"  {view} ✓")
 
+    # 统计实际处理数量
+    if not generate_images and generate_video and video_view != "all":
+        views_processed = 1
+    else:
+        views_processed = 7
+
     print(f"\n推理完成! 结果保存在: {output_dir}")
-    print(f"共处理 {len(selected_timestamps)} 个时间戳, {len(selected_timestamps) * 7} 张图像")
+    print(f"共处理 {len(selected_timestamps)} 个时间戳, {len(selected_timestamps) * views_processed} 张图像")
     if generate_images:
         print(f"图片已保存到各时间戳子文件夹")
 
