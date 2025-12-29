@@ -2,10 +2,13 @@
 交互式推理脚本
 - 每个时间戳生成一个文件夹
 - 每个文件夹包含 7 个视角的对比图
+- 可生成视频（90帧，10fps，1280x720）
 - 交互式选择参数，按 Enter 使用默认值
 """
 import os
 import torch
+import cv2
+import numpy as np
 from collections import defaultdict
 from PIL import Image
 import torchvision.transforms as T
@@ -28,6 +31,31 @@ def load_image(path, image_size=(512, 512)):
     return transform(img)
 
 
+def tensor_to_cv2(tensor, size=(1280, 720)):
+    """将 tensor 转换为 cv2 格式的图像"""
+    # tensor: [1, 3, H, W] -> numpy [H, W, 3]
+    img = tensor.squeeze(0).permute(1, 2, 0).cpu().numpy()
+    img = (img * 255).astype(np.uint8)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    img = cv2.resize(img, size)
+    return img
+
+
+def create_comparison_frame(proj, generated, gt, size=(1280, 720)):
+    """创建对比帧：proj | generated | gt 横向拼接"""
+    # 每个图像占 1/3 宽度
+    w = size[0] // 3
+    h = size[1]
+
+    proj_img = tensor_to_cv2(proj, (w, h))
+    gen_img = tensor_to_cv2(generated, (w, h))
+    gt_img = tensor_to_cv2(gt, (w, h))
+
+    # 横向拼接
+    frame = np.concatenate([proj_img, gen_img, gt_img], axis=1)
+    return frame
+
+
 def main():
     print("=" * 50)
     print("  交互式推理脚本")
@@ -39,9 +67,12 @@ def main():
     default_ckpt = "./experiments/p2g_20251226_155015/checkpoints/last.ckpt"
     default_data_root = "/mnt/zihanw/proj_utils_pro/blur投影/044/044"
     default_output_dir = "./inference_output"
-    default_num_timestamps = "5"
+    default_num_timestamps = "-1"  # 默认全部，用于生成视频
     default_num_steps = "50"
-    default_from_middle = "y"
+    default_from_middle = "n"
+    default_generate_video = "y"
+    default_video_fps = "10"
+    default_video_view = "FN"  # 默认用 FN 视角生成视频
 
     # 交互式输入
     ckpt_path = prompt_input("Checkpoint 路径", default_ckpt)
@@ -50,6 +81,16 @@ def main():
     num_timestamps_str = prompt_input("处理时间戳数量 (-1 表示全部)", default_num_timestamps)
     num_steps_str = prompt_input("推理步数", default_num_steps)
     from_middle_str = prompt_input("从中间开始选择 (y/n)", default_from_middle)
+    generate_video_str = prompt_input("生成视频 (y/n)", default_generate_video)
+
+    generate_video = generate_video_str.lower() in ['y', 'yes', '1', 'true']
+    video_fps = 10
+    video_view = "FN"
+
+    if generate_video:
+        video_fps_str = prompt_input("视频帧率 (fps)", default_video_fps)
+        video_view = prompt_input("视频使用的视角 (FL/FN/FR/FW/RL/RN/RR/all)", default_video_view)
+        video_fps = int(video_fps_str)
 
     # 转换参数
     num_timestamps = int(num_timestamps_str)
@@ -66,6 +107,10 @@ def main():
     print(f"  时间戳数量: {num_timestamps}")
     print(f"  推理步数: {num_steps}")
     print(f"  从中间开始: {from_middle}")
+    print(f"  生成视频: {generate_video}")
+    if generate_video:
+        print(f"  视频帧率: {video_fps} fps")
+        print(f"  视频视角: {video_view}")
     print("=" * 50)
     print()
 
@@ -132,6 +177,9 @@ def main():
     print(f"将处理 {len(selected_timestamps)} 个时间戳")
     print(f"时间戳列表: {selected_timestamps[:3]}...{selected_timestamps[-1] if len(selected_timestamps) > 3 else ''}")
 
+    # 视频帧缓存
+    video_frames = defaultdict(list)  # {view: [frames]}
+
     # 推理
     for i, timestamp in enumerate(selected_timestamps):
         print(f"\n[{i+1}/{len(selected_timestamps)}] 正在处理: {timestamp}")
@@ -157,10 +205,31 @@ def main():
             gen_path = os.path.join(timestamp_output_dir, f"{view}_generated.jpg")
             save_image(generated.cpu(), gen_path)
 
+            # 缓存视频帧
+            if generate_video and (video_view == "all" or video_view == view):
+                frame = create_comparison_frame(proj_tensor, generated, gt_tensor)
+                video_frames[view].append(frame)
+
             print(f"  {view} ✓")
 
     print(f"\n推理完成! 结果保存在: {output_dir}")
     print(f"共处理 {len(selected_timestamps)} 个时间戳, {len(selected_timestamps) * 7} 张图像")
+
+    # 生成视频
+    if generate_video and video_frames:
+        print("\n正在生成视频...")
+        for view, frames in video_frames.items():
+            video_path = os.path.join(output_dir, f"video_{view}_comparison.mp4")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(video_path, fourcc, video_fps, (1280, 720))
+
+            for frame in frames:
+                out.write(frame)
+
+            out.release()
+            print(f"  视频已保存: {video_path} ({len(frames)} 帧, {video_fps} fps)")
+
+        print(f"\n视频生成完成!")
 
 
 if __name__ == "__main__":
