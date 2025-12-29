@@ -67,23 +67,36 @@ def main():
     default_ckpt = "./experiments/p2g_20251226_155015/checkpoints/last.ckpt"
     default_data_root = "/mnt/zihanw/proj_utils_pro/blur投影/044/044"
     default_output_dir = "./inference_output"
-    default_num_timestamps = "-1"  # 默认全部，用于生成视频
+    default_num_timestamps = "-1"  # 默认全部
     default_num_steps = "50"
     default_from_middle = "n"
-    default_generate_video = "y"
+    default_mode = "both"  # 默认生成图片和视频
     default_video_fps = "10"
     default_video_view = "FN"  # 默认用 FN 视角生成视频
 
     # 交互式输入
     ckpt_path = prompt_input("Checkpoint 路径", default_ckpt)
     data_root = prompt_input("数据文件夹路径", default_data_root)
+
+    # 先扫描数据，显示实际帧数
+    print(f"\n正在扫描: {data_root}")
+    actual_timestamps = [d for d in os.listdir(data_root) if os.path.isdir(os.path.join(data_root, d))]
+    print(f">>> 找到 {len(actual_timestamps)} 个时间戳 <<<\n")
+
     output_dir = prompt_input("输出目录", default_output_dir)
-    num_timestamps_str = prompt_input("处理时间戳数量 (-1 表示全部)", default_num_timestamps)
+    num_timestamps_str = prompt_input(f"处理时间戳数量 (-1 表示全部 {len(actual_timestamps)} 个)", default_num_timestamps)
     num_steps_str = prompt_input("推理步数", default_num_steps)
     from_middle_str = prompt_input("从中间开始选择 (y/n)", default_from_middle)
-    generate_video_str = prompt_input("生成视频 (y/n)", default_generate_video)
 
-    generate_video = generate_video_str.lower() in ['y', 'yes', '1', 'true']
+    # 生成模式选择
+    print("\n生成模式:")
+    print("  image - 仅生成图片（每个时间戳一个文件夹，包含对比图）")
+    print("  video - 仅生成视频（不保存单独图片）")
+    print("  both  - 同时生成图片和视频")
+    mode_str = prompt_input("选择生成模式 (image/video/both)", default_mode)
+
+    generate_images = mode_str.lower() in ['image', 'both', 'i', 'b']
+    generate_video = mode_str.lower() in ['video', 'both', 'v', 'b']
     video_fps = 10
     video_view = "FN"
 
@@ -107,6 +120,8 @@ def main():
     print(f"  时间戳数量: {num_timestamps}")
     print(f"  推理步数: {num_steps}")
     print(f"  从中间开始: {from_middle}")
+    print(f"  生成模式: {mode_str}")
+    print(f"  生成图片: {generate_images}")
     print(f"  生成视频: {generate_video}")
     if generate_video:
         print(f"  视频帧率: {video_fps} fps")
@@ -184,8 +199,10 @@ def main():
     for i, timestamp in enumerate(selected_timestamps):
         print(f"\n[{i+1}/{len(selected_timestamps)}] 正在处理: {timestamp}")
 
-        timestamp_output_dir = os.path.join(output_dir, timestamp)
-        os.makedirs(timestamp_output_dir, exist_ok=True)
+        # 只在生成图片模式下创建时间戳文件夹
+        if generate_images:
+            timestamp_output_dir = os.path.join(output_dir, timestamp)
+            os.makedirs(timestamp_output_dir, exist_ok=True)
 
         views = timestamps_data[timestamp]
         for view, paths in views.items():
@@ -196,14 +213,16 @@ def main():
                 generated = model.generate_from_lidar(proj_tensor, num_inference_steps=num_steps)
                 generated = torch.clamp(generated, 0, 1)
 
-            # 保存对比图: proj | generated | gt
-            comparison = torch.cat([proj_tensor.cpu(), generated.cpu(), gt_tensor.cpu()], dim=3)
-            output_path = os.path.join(timestamp_output_dir, f"{view}_comparison.jpg")
-            save_image(comparison, output_path)
+            # 保存图片（仅在 image 或 both 模式下）
+            if generate_images:
+                # 保存对比图: proj | generated | gt
+                comparison = torch.cat([proj_tensor.cpu(), generated.cpu(), gt_tensor.cpu()], dim=3)
+                output_path = os.path.join(timestamp_output_dir, f"{view}_comparison.jpg")
+                save_image(comparison, output_path)
 
-            # 单独保存生成的图像
-            gen_path = os.path.join(timestamp_output_dir, f"{view}_generated.jpg")
-            save_image(generated.cpu(), gen_path)
+                # 单独保存生成的图像
+                gen_path = os.path.join(timestamp_output_dir, f"{view}_generated.jpg")
+                save_image(generated.cpu(), gen_path)
 
             # 缓存视频帧
             if generate_video and (video_view == "all" or video_view == view):
@@ -214,6 +233,8 @@ def main():
 
     print(f"\n推理完成! 结果保存在: {output_dir}")
     print(f"共处理 {len(selected_timestamps)} 个时间戳, {len(selected_timestamps) * 7} 张图像")
+    if generate_images:
+        print(f"图片已保存到各时间戳子文件夹")
 
     # 生成视频
     if generate_video and video_frames:
