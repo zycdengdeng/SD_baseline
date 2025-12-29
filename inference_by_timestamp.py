@@ -31,25 +31,20 @@ def load_image(path, image_size=(512, 512)):
     return transform(img)
 
 
-def tensor_to_cv2(tensor, size=(1280, 720)):
-    """将 tensor 转换为 cv2 格式的图像"""
+def tensor_to_cv2(tensor):
+    """将 tensor 转换为 cv2 格式的图像，保持原始分辨率"""
     # tensor: [1, 3, H, W] -> numpy [H, W, 3]
     img = tensor.squeeze(0).permute(1, 2, 0).cpu().numpy()
     img = (img * 255).astype(np.uint8)
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    img = cv2.resize(img, size)
     return img
 
 
-def create_comparison_frame(proj, generated, gt, size=(1280, 720)):
+def create_comparison_frame(proj, generated, gt):
     """创建对比帧：proj | generated | gt 横向拼接"""
-    # 每个图像占 1/3 宽度
-    w = size[0] // 3
-    h = size[1]
-
-    proj_img = tensor_to_cv2(proj, (w, h))
-    gen_img = tensor_to_cv2(generated, (w, h))
-    gt_img = tensor_to_cv2(gt, (w, h))
+    proj_img = tensor_to_cv2(proj)
+    gen_img = tensor_to_cv2(generated)
+    gt_img = tensor_to_cv2(gt)
 
     # 横向拼接
     frame = np.concatenate([proj_img, gen_img, gt_img], axis=1)
@@ -257,6 +252,11 @@ def main():
 
             video_path = os.path.join(output_dir, f"video_{view}_comparison.mp4")
 
+            # 从第一帧获取实际尺寸
+            frame_h, frame_w = frames[0].shape[:2]
+            frame_size = (frame_w, frame_h)
+            print(f"  帧尺寸: {frame_w}x{frame_h}")
+
             # 尝试不同的编码器
             codecs = [
                 ('mp4v', '.mp4'),
@@ -269,7 +269,7 @@ def main():
                 try:
                     test_path = video_path.replace('.mp4', ext)
                     fourcc = cv2.VideoWriter_fourcc(*codec)
-                    out = cv2.VideoWriter(test_path, fourcc, video_fps, (1280, 720))
+                    out = cv2.VideoWriter(test_path, fourcc, video_fps, frame_size)
 
                     if not out.isOpened():
                         print(f"  编码器 {codec} 不可用，尝试下一个...")
