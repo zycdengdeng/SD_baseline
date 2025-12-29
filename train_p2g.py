@@ -113,31 +113,32 @@ lr_monitor = LearningRateMonitor(logging_interval="step")
 class ImageGenerationCallback(Callback):
     def __init__(self, save_dir):
         self.save_dir = save_dir
-        
+
     def on_validation_epoch_end(self, trainer, pl_module):
-        if trainer.current_epoch % 20 == 0 and trainer.global_rank == 0:
+        # 每次验证都生成图像（验证已经是每 50 epoch 一次了）
+        if trainer.global_rank == 0:
             pl_module.eval()
-            
-            epoch_dir = f"{self.save_dir}/images/epoch_{trainer.current_epoch:03d}"
+
+            epoch_dir = f"{self.save_dir}/images/epoch_{trainer.current_epoch:04d}"
             os.makedirs(epoch_dir, exist_ok=True)
-            
+
             val_dataloader = trainer.datamodule.val_dataloader()
             val_iterator = iter(val_dataloader)
-            
+
             for i in range(min(5, len(val_dataloader))):
                 try:
                     batch = next(val_iterator)
                     gt = batch["rgb"][0:1].to(pl_module.device)
                     proj = batch["lidar_sparse"][0:1].to(pl_module.device)
-                    
+
                     with torch.no_grad():
                         generated = pl_module.generate_from_lidar(proj, num_inference_steps=20)
                         generated = torch.clamp(generated, 0, 1)
-                        
+
                         # 创建对比图
                         comparison = torch.cat([proj, generated, gt], dim=3)
                         save_image(comparison, f"{epoch_dir}/sample_{i:02d}_comparison.jpg")
-                        
+
                 except Exception as e:
                     print(f"生成图像失败: {e}")
                     break
