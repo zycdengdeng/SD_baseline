@@ -1,0 +1,14 @@
+# 评测工具依赖
+
+# 核心指标
+torchmetrics>=1.0.0
+lpips>=0.1.4
+
+# 目标检测
+ultralytics>=8.0.0
+
+# 基础依赖（通常已安装）
+torch
+torchvision
+numpy
+pillow
