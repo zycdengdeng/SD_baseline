@@ -231,7 +231,7 @@ def main():
     # 默认值
     default_ckpt = "/mnt/zihanw/SD_baseline/experiments/p2g_20251226_155015/checkpoints/best-epoch=epoch=149-val_loss=val/loss=0.314.ckpt"
     default_clip = "/mnt/zihanw/proj_utils_pro/blur投影/001/001"
-    default_output = "./evaluation_results"
+    default_output = "/mnt/zihanw/SD_baseline/evaRes"
     default_num_timestamps = "10"
     default_num_steps = "50"
     default_yolo = "y"
